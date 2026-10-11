@@ -59,7 +59,7 @@
       <nav aria-label="Ruta de navegación">
         <ol class="breadcrumb small">
           <li class="breadcrumb-item"><a href="perfil.html?tab=participados">Quizzes participados</a></li>
-          <li class="breadcrumb-item active" aria-current="page">Intento del <span data-bind="startedAt">9 oct 2026</span></li>
+          <li class="breadcrumb-item active" aria-current="page">Intento del <span data-bind="startedAt|fecha">9 oct 2026</span></li>
         </ol>
       </nav>
 
@@ -115,7 +115,7 @@
         <!-- Quiz borrado por su creador: se ocultan "Jugar de nuevo" e "Ir al foro" -->
         <div class="alert alert-warning d-flex gap-2" role="note" data-show-if="quiz.deleted" hidden>
           <i class="bi bi-archive mt-1" aria-hidden="true"></i>
-          <span>El creador eliminó este quiz. Podrás consultar este intento hasta el <strong data-bind="quiz.expiresAt">6 ene 2027</strong>.</span>
+          <span>El creador eliminó este quiz. Podrás consultar este intento hasta el <strong data-bind="quiz.expiresAt|fecha">6 ene 2027</strong>.</span>
         </div>
 
         <!-- Revisión pregunta por pregunta -->
@@ -230,7 +230,18 @@
 
   <!-- Bootstrap JS oficial: menú móvil, dropdowns, pestañas, plegables y modales -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Siguiente etapa (JS): descomentar al implementar la página
-  <script type="module" src="js/pages/resultado.js"></script> -->
+  <!-- Markdown seguro (RNF-05): marked convierte y DOMPurify limpia -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
+  <!-- Quiztopia: modelos, base simulada, API y motor de vistas (el orden importa) -->
+  <script src="js/core.js" defer></script>
+  <script src="js/models.js" defer></script>
+  <script src="js/db.js" defer></script>
+  <script src="js/seed.js" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/tests.js" defer></script>
+  <script src="js/app.js" defer></script>
+  <script src="js/pages/resultado.js" defer></script>
 </body>
 </html>
