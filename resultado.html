@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resultados · Quiztopia</title>
+  <meta name="description" content="Resultados y revisión del intento">
+  <!-- Bootstrap por CDN. Al activar helmet (CSP), muévanlo a public/vendor/ -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip-link visually-hidden-focusable" href="#main">Saltar al contenido</a>
+
+  <!-- ===== Navbar global (pantalla 1) =====
+       GET /api/auth/me decide qué bloque se muestra:
+       data-show-if="session" (con sesión) o data-show-if="!session" (visitante). -->
+  <header>
+    <nav class="navbar navbar-expand-md bg-white border-bottom sticky-top" aria-label="Principal">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="index.html"><span class="brand-mark" aria-hidden="true"><i class="bi bi-patch-question-fill"></i></span>Quiztopia</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav me-auto mb-2 mb-md-0">
+            <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-compass me-1" aria-hidden="true"></i>Explorar</a></li>
+            <li class="nav-item" data-show-if="session"><a class="nav-link" href="editor.html"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Crear quiz</a></li>
+          </ul>
+
+          <div class="dropdown" data-show-if="session">
+            <button class="btn btn-light d-flex align-items-center gap-2 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="avatar" aria-hidden="true" data-bind="me.initials">AN</span><span>@<span data-bind="me.username">ana_dev</span></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="perfil.html?tab=creados"><i class="bi bi-collection me-2" aria-hidden="true"></i>Quizzes creados</a></li>
+              <li><a class="dropdown-item" href="perfil.html?tab=participados"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Quizzes participados</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item" type="button" data-action="logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
+            </ul>
+          </div>
+
+          <div class="nav-visitor" data-show-if="!session" hidden>
+            <a class="btn btn-outline-primary flex-fill" href="acceso.html?modo=login" data-action="go-login">Iniciar sesión</a>
+            <a class="btn btn-primary flex-fill" href="acceso.html?modo=registro" data-action="go-register">Registrarse</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ===== Pantalla 10: Resultados y revisión (ruta /resultado/:attemptId → resultado.html?attempt={attemptId}) =====
+       API: GET /api/attempts/:id — devuelve la versión (snapshot) que se jugó, con isCorrect y lo que marcó el jugador.
+       Estado mostrado: intento de @ana_dev en AWS Cloud Practitioner (versión 1, vigente), 9 oct 2026,
+       terminó por tiempo agotado (límite 5 min) con 2 de 4 correctas. -->
+  <main id="main" tabindex="-1" class="container py-4" data-region="attempt">
+    <div class="play-shell">
+      <nav aria-label="Ruta de navegación">
+        <ol class="breadcrumb small">
+          <li class="breadcrumb-item"><a href="perfil.html?tab=participados">Quizzes participados</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Intento del <span data-bind="startedAt">9 oct 2026</span></li>
+        </ol>
+      </nav>
+
+      <div data-state="loading" hidden>
+        <div aria-busy="true">
+          <div class="state py-4"><div class="spinner-border text-primary" aria-hidden="true"></div></div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+      </div>
+      <div data-state="error" hidden>
+        <div class="state state-error" role="alert">
+          <i class="bi bi-wifi-off state-icon" aria-hidden="true"></i>
+          <p class="h5">Algo salió mal</p>
+          <p class="text-muted-qt">No pudimos cargar el intento.</p>
+          <button type="button" class="btn btn-outline-primary" data-action="retry"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reintentar</button>
+        </div>
+      </div>
+      <!-- 404: el intento ya expiró (pasaron los 3 meses tras borrar el quiz) -->
+      <div data-state="empty" hidden>
+        <div class="state">
+          <i class="bi bi-archive state-icon" aria-hidden="true"></i>
+          <p class="h5">Este intento ya no está disponible</p>
+          <p class="text-muted-qt mb-0">El quiz se borró hace más de 3 meses y sus intentos se eliminaron.</p>
+        </div>
+      </div>
+
+      <div data-state="content">
+        <!-- Puntaje -->
+        <section class="card mb-4" aria-labelledby="score-title">
+          <div class="card-body p-4 text-center">
+            <!-- Título según porcentaje: ≥ 70 "¡Buen trabajo!", 40–69 "Buen intento", < 40 "Sigue practicando" -->
+            <h1 id="score-title" class="h4 fw-bold mb-1" data-bind="scoreTitle">Buen intento</h1>
+            <p class="text-muted-qt mb-4" data-bind="quiz.title">AWS Cloud Practitioner: servicios básicos</p>
+            <!-- --p = porcentaje; --c = color (verde #15803d ≥ 70 · ámbar #b45309 40–69 · rojo #b91c1c < 40) -->
+            <div class="score-ring mx-auto mb-3" style="--p: 50; --c: #b45309;" role="img" aria-label="2 de 4 correctas, 50 por ciento" data-bind-style="--p:percentage">
+              <div><strong><span data-bind="score">2</span>/<span data-bind="total">4</span></strong><span class="small text-muted-qt"><span data-bind="percentage">50</span> %</span></div>
+            </div>
+            <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+              <span class="badge text-bg-light border"><i class="bi bi-layers me-1" aria-hidden="true"></i>Versión <span data-bind="version">1</span></span>
+              <span class="badge text-bg-light border"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><span data-bind="startedAt">9 oct 2026, 12:00</span></span>
+              <span class="badge text-bg-light border"><i class="bi bi-clock me-1" aria-hidden="true"></i><span data-bind="durationLabel">5 min</span></span>
+              <span class="badge text-bg-warning" data-show-if="timedOut"><i class="bi bi-hourglass-bottom me-1" aria-hidden="true"></i>Tiempo agotado</span>
+            </div>
+            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+              <!-- "Jugar de nuevo" lleva al detalle, donde se inicia un intento nuevo con la versión vigente -->
+              <a class="btn btn-primary" href="quiz.html?id=q-aws" data-href="quiz.html?id={quiz.quizId}" data-show-if="!quiz.deleted"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Jugar de nuevo</a>
+              <a class="btn btn-outline-primary" href="quiz.html?id=q-aws#foro" data-href="quiz.html?id={quiz.quizId}#foro" data-show-if="!quiz.deleted"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Ir al foro</a>
+              <a class="btn btn-light" href="perfil.html?tab=participados"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Mi historial</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quiz borrado por su creador: se ocultan "Jugar de nuevo" e "Ir al foro" -->
+        <div class="alert alert-warning d-flex gap-2" role="note" data-show-if="quiz.deleted" hidden>
+          <i class="bi bi-archive mt-1" aria-hidden="true"></i>
+          <span>El creador eliminó este quiz. Podrás consultar este intento hasta el <strong data-bind="quiz.expiresAt">6 ene 2027</strong>.</span>
+        </div>
+
+        <!-- Revisión pregunta por pregunta -->
+        <section aria-labelledby="review-title">
+          <h2 id="review-title" class="h5 mb-3">Revisión</h2>
+          <div class="alert alert-primary d-flex gap-2 small" role="note">
+            <i class="bi bi-camera mt-1" aria-hidden="true"></i>
+            <div>
+              <span data-show-if="isCurrentVersion">Revisas la <strong>versión <span data-bind="version">1</span></strong>, que sigue siendo la vigente.</span>
+              <span data-show-if="!isCurrentVersion" hidden>Revisas el <strong>snapshot de la versión <span data-bind="version">1</span></strong>, tal como la jugaste. El quiz ya va en la versión <span data-bind="quiz.version">2</span>, pero tu puntaje no cambia.</span>
+            </div>
+          </div>
+
+          <div data-list="questions" data-template="tpl-review-question">
+            <article class="card review-q ok mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                  <span class="section-label">Pregunta 1</span>
+                  <span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correcta</span>
+                </div>
+                <div class="markdown-body fw-semibold mb-3"><p>¿Qué servicio de AWS ofrece <strong>almacenamiento de objetos</strong>?</p></div>
+                <div class="review-opt correct"><i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>Amazon S3</p><small class="text-success fw-semibold">Tu respuesta · Correcta</small></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Amazon EC2</p></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Amazon RDS</p></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>AWS Lambda</p></div></div>
+                <div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i><strong>Explicación:</strong> Amazon S3 guarda objetos en <em>buckets</em>. EC2 es cómputo y RDS bases de datos.</div>
+              </div>
+            </article>
+
+            <article class="card review-q bad mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                  <span class="section-label">Pregunta 2 · Varias respuestas</span>
+                  <span class="badge bg-danger-subtle text-danger-emphasis"><i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>Incorrecta</span>
+                </div>
+                <div class="markdown-body fw-semibold mb-3"><p>¿Cuáles de los siguientes son <strong>beneficios</strong> de la nube?</p></div>
+                <div class="review-opt correct"><i class="bi bi-check-square-fill text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>Pagar solo por lo que usas</p><small class="text-success fw-semibold">Tu respuesta · Correcta</small></div></div>
+                <div class="review-opt correct"><i class="bi bi-square text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>Escalar según la demanda</p><small class="text-success fw-semibold">Correcta · no la marcaste</small></div></div>
+                <div class="review-opt"><i class="bi bi-square text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Eliminar toda responsabilidad de seguridad</p></div></div>
+                <div class="review-opt correct"><i class="bi bi-check-square-fill text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>Desplegar globalmente en minutos</p><small class="text-success fw-semibold">Tu respuesta · Correcta</small></div></div>
+                <div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i><strong>Explicación:</strong> La nube permite pagar por uso, escalar y desplegar rápido; la seguridad sigue siendo compartida. Regla «todo o nada»: faltó marcar una correcta.</div>
+              </div>
+            </article>
+
+            <article class="card review-q ok mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                  <span class="section-label">Pregunta 3</span>
+                  <span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correcta</span>
+                </div>
+                <div class="markdown-body fw-semibold mb-3"><p>Según el modelo de responsabilidad compartida, ¿quién parchea el sistema operativo de una instancia EC2?</p></div>
+                <div class="review-opt correct"><i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>El cliente</p><small class="text-success fw-semibold">Tu respuesta · Correcta</small></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>AWS</p></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Ambos por igual</p></div></div>
+              </div>
+            </article>
+
+            <article class="card review-q bad mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                  <span class="section-label">Pregunta 4</span>
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis"><i class="bi bi-dash-circle me-1" aria-hidden="true"></i>Sin responder</span>
+                </div>
+                <div class="markdown-body fw-semibold mb-3"><p>¿Qué servicio permite ejecutar código <strong>sin administrar servidores</strong>?</p></div>
+                <div class="review-opt correct"><i class="bi bi-circle text-success" aria-hidden="true"></i><div class="flex-grow-1"><p>AWS Lambda</p><small class="text-success fw-semibold">Correcta</small></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Amazon EC2</p></div></div>
+                <div class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><div class="flex-grow-1"><p>Amazon EBS</p></div></div>
+                <p class="small text-muted-qt mt-3 mb-0">Se acabó el tiempo antes de responder esta pregunta.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===== Plantillas para JS (no se muestran) ===== -->
+    <!-- status: "correct" → .ok + badge verde · "wrong" → .bad + badge rojo · "unanswered" → .bad + badge gris -->
+    <template id="tpl-review-question">
+      <article class="card review-q mb-3" data-class="status === 'correct' ? 'ok' : 'bad'">
+        <div class="card-body">
+          <div class="d-flex justify-content-between gap-2 mb-2">
+            <span class="section-label">Pregunta <span data-bind="position"></span><span data-show-if="multiple"> · Varias respuestas</span></span>
+            <span class="badge bg-success-subtle text-success-emphasis" data-show-if="status === 'correct'"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correcta</span>
+            <span class="badge bg-danger-subtle text-danger-emphasis" data-show-if="status === 'wrong'"><i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>Incorrecta</span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis" data-show-if="status === 'unanswered'"><i class="bi bi-dash-circle me-1" aria-hidden="true"></i>Sin responder</span>
+          </div>
+          <div class="markdown-body fw-semibold mb-3" data-bind-markdown="text"></div>
+          <div data-list="options" data-template="tpl-review-option"></div>
+          <div class="alert alert-light border small mt-3 mb-0" data-show-if="explanation"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i><strong>Explicación:</strong> <span class="markdown-body" data-bind-markdown="explanation"></span></div>
+        </div>
+      </article>
+    </template>
+
+    <!-- Clase: "correct" si isCorrect · "wrong" si selected && !isCorrect. Nota según selected/isCorrect. -->
+    <template id="tpl-review-option">
+      <div class="review-opt">
+        <i class="bi" aria-hidden="true" data-slot="icon"></i>
+        <div class="flex-grow-1">
+          <div class="markdown-body" data-bind-markdown="text"></div>
+          <small class="fw-semibold" data-bind="note"></small>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <footer class="site-footer py-4 mt-5">
+    <div class="container d-flex flex-column flex-sm-row justify-content-between gap-2">
+      <span>© 2026 Quiztopia · ITESO · Desarrollo de aplicaciones y servicios web</span>
+      <a class="link-secondary" href="estados.html">Guía de estados y componentes</a>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS oficial: menú móvil, dropdowns, pestañas, plegables y modales -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Siguiente etapa (JS): descomentar al implementar la página
+  <script type="module" src="js/pages/resultado.js"></script> -->
+</body>
+</html>

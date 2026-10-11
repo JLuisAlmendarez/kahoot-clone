@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Explorar quizzes · Quiztopia</title>
+  <meta name="description" content="Catálogo, búsqueda y clasificación">
+  <!-- Bootstrap por CDN. Al activar helmet (CSP), muévanlo a public/vendor/ -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip-link visually-hidden-focusable" href="#main">Saltar al contenido</a>
+
+  <!-- ===== Navbar global (pantalla 1) =====
+       GET /api/auth/me decide qué bloque se muestra:
+       data-show-if="session" (con sesión) o data-show-if="!session" (visitante). -->
+  <header>
+    <nav class="navbar navbar-expand-md bg-white border-bottom sticky-top" aria-label="Principal">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="index.html"><span class="brand-mark" aria-hidden="true"><i class="bi bi-patch-question-fill"></i></span>Quiztopia</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav me-auto mb-2 mb-md-0">
+            <li class="nav-item"><a class="nav-link active" aria-current="page" href="index.html"><i class="bi bi-compass me-1" aria-hidden="true"></i>Explorar</a></li>
+            <li class="nav-item" data-show-if="session"><a class="nav-link" href="editor.html"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Crear quiz</a></li>
+          </ul>
+
+          <div class="dropdown" data-show-if="session">
+            <button class="btn btn-light d-flex align-items-center gap-2 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="avatar" aria-hidden="true" data-bind="me.initials">AN</span><span>@<span data-bind="me.username">ana_dev</span></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="perfil.html?tab=creados"><i class="bi bi-collection me-2" aria-hidden="true"></i>Quizzes creados</a></li>
+              <li><a class="dropdown-item" href="perfil.html?tab=participados"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Quizzes participados</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item" type="button" data-action="logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
+            </ul>
+          </div>
+
+          <div class="nav-visitor" data-show-if="!session" hidden>
+            <a class="btn btn-outline-primary flex-fill" href="acceso.html?modo=login" data-action="go-login">Iniciar sesión</a>
+            <a class="btn btn-primary flex-fill" href="acceso.html?modo=registro" data-action="go-register">Registrarse</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ===== Pantalla 3: Catálogo, búsqueda y clasificación (ruta /) =====
+       API: GET /api/quizzes?q=&page=&limit=  ·  GET /api/categories
+       Ejemplo mostrado: q = "sort:populares nivel:basico", página 1 de 3 (limit = 6). -->
+  <main id="main" tabindex="-1" class="container py-4">
+
+    <!-- Búsqueda con calificadores. La URL guarda q y page para que la búsqueda sea compartible. -->
+    <section class="page-hero mb-4" aria-labelledby="hero-title">
+      <h1 id="hero-title" class="h3 fw-bold mb-1">Aprende resolviendo quizzes</h1>
+      <p class="mb-3 opacity-75">Certificaciones, matemáticas, química, programación y más, a tu ritmo.</p>
+      <form action="index.html" method="get" role="search" class="d-flex flex-column flex-sm-row gap-2" data-form="search">
+        <label for="search-input" class="visually-hidden">Buscar quizzes</label>
+        <div class="input-group input-group-lg flex-grow-1">
+          <span class="input-group-text bg-white border-0"><i class="bi bi-search" aria-hidden="true"></i></span>
+          <input id="search-input" name="q" type="search" class="form-control" maxlength="200" autocomplete="off"
+                 placeholder="Busca por tema o usa filtros: categoria:quimica" value="sort:populares nivel:basico" aria-describedby="search-hint">
+        </div>
+        <input type="hidden" name="limit" value="6">
+        <button class="btn btn-light btn-lg fw-semibold" type="submit">Buscar</button>
+      </form>
+      <p id="search-hint" class="search-hint small mt-2 mb-0">
+        Filtros: <code>categoria:quimica</code> <code>autor:luis_m</code> <code>etiqueta:aws</code>
+        <code>preguntas:&gt;5</code> <code>sort:populares</code>
+      </p>
+    </section>
+
+    <!-- Filtros rápidos: cada chip agrega o reemplaza el calificador categoria: en q -->
+    <section aria-label="Filtros" class="mb-3">
+      <div class="d-flex flex-column flex-md-row gap-3 align-items-md-center justify-content-between">
+        <div class="chip-row" role="group" aria-label="Categorías" data-list="categories" data-template="tpl-category-chip">
+          <a class="chip" href="index.html" aria-current="true">Todas</a>
+          <a class="chip" href="index.html?q=categoria:certificaciones">Certificaciones</a>
+          <a class="chip" href="index.html?q=categoria:programacion">Programación</a>
+          <a class="chip" href="index.html?q=categoria:matematicas">Matemáticas</a>
+          <a class="chip" href="index.html?q=categoria:quimica">Química</a>
+          <a class="chip" href="index.html?q=categoria:fisica">Física</a>
+          <a class="chip" href="index.html?q=categoria:biologia">Biología</a>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          <!-- Equivale a escribir sort:populares en la búsqueda; se mantienen sincronizados -->
+          <label for="sort-select" class="small text-muted-qt text-nowrap">Ordenar por</label>
+          <select id="sort-select" class="form-select form-select-sm" data-action="sort">
+            <option value="recientes">Más recientes</option>
+            <option value="populares" selected>Más populares</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Resultados -->
+    <section aria-labelledby="results-title" data-region="catalogo">
+      <div class="d-flex justify-content-between align-items-baseline mb-2">
+        <h2 id="results-title" class="h5 mb-0">Quizzes</h2>
+        <span class="small text-muted-qt" aria-live="polite"><span data-bind="total">18</span> resultados</span>
+      </div>
+
+      <!-- ignored[] de la API: calificadores que no se reconocieron -->
+      <div class="alert alert-warning py-2 small" role="status" data-show-if="ignored.length">
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        Se ignoró este filtro porque no se reconoce: <code data-bind="ignored">nivel:basico</code>
+      </div>
+
+      <div data-state="loading" hidden>
+        <div aria-busy="true">
+          <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+            <div class="col"><div class="card h-100"><div class="card-body">
+              <span class="skeleton skeleton-text w-25 mb-3"></span><span class="skeleton skeleton-title mb-2"></span>
+              <span class="skeleton skeleton-text w-50 mb-4"></span><span class="skeleton skeleton-text w-75"></span>
+            </div></div></div>
+            <div class="col"><div class="card h-100"><div class="card-body">
+              <span class="skeleton skeleton-text w-25 mb-3"></span><span class="skeleton skeleton-title mb-2"></span>
+              <span class="skeleton skeleton-text w-50 mb-4"></span><span class="skeleton skeleton-text w-75"></span>
+            </div></div></div>
+            <div class="col"><div class="card h-100"><div class="card-body">
+              <span class="skeleton skeleton-text w-25 mb-3"></span><span class="skeleton skeleton-title mb-2"></span>
+              <span class="skeleton skeleton-text w-50 mb-4"></span><span class="skeleton skeleton-text w-75"></span>
+            </div></div></div>
+          </div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+      </div>
+      <div data-state="error" hidden>
+        <div class="state state-error" role="alert">
+          <i class="bi bi-wifi-off state-icon" aria-hidden="true"></i>
+          <p class="h5">Algo salió mal</p>
+          <p class="text-muted-qt">No pudimos cargar los quizzes. Revisa tu conexión e inténtalo de nuevo.</p>
+          <button type="button" class="btn btn-outline-primary" data-action="retry"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reintentar</button>
+        </div>
+      </div>
+      <div data-state="empty" hidden>
+        <div class="state">
+          <i class="bi bi-search state-icon" aria-hidden="true"></i>
+          <p class="h5">No encontramos quizzes</p>
+          <p class="text-muted-qt">Prueba con otras palabras o quita algún filtro.</p>
+          <a class="btn btn-primary" href="editor.html" data-show-if="session"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Crear el primero</a>
+        </div>
+      </div>
+
+      <div data-state="content">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3" data-list="items" data-template="tpl-quiz-card">
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Certificaciones</span>
+                  <span class="small text-muted-qt text-nowrap"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>5 min</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-aws">AWS Cloud Practitioner: servicios básicos</a></h3>
+                <p class="small text-muted-qt mb-2">por @ricardo_e</p>
+                <p class="mb-3"><span class="tag me-2">#aws</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>4 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>31<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>88<span class="visually-hidden"> intentos</span></span>
+                  <span class="badge text-bg-light border">Varias respuestas</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Programación</span>
+                  <span class="small text-muted-qt text-nowrap"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>15 min</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-python">Python: listas y diccionarios</a></h3>
+                <p class="small text-muted-qt mb-2">por @gael_jv</p>
+                <p class="mb-3"><span class="tag me-2">#python</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>12 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>22<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>61<span class="visually-hidden"> intentos</span></span>
+                  <span class="badge text-bg-light border">Varias respuestas</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Matemáticas</span>
+                  <span class="small text-muted-qt text-nowrap"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>30 min</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-algebra">Álgebra lineal: matrices</a></h3>
+                <p class="small text-muted-qt mb-2">por @luis_m</p>
+                <p class="mb-3"><span class="tag me-2">#algebra</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>10 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>17<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>42<span class="visually-hidden"> intentos</span></span>
+                  <span class="badge text-bg-light border">Varias respuestas</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Matemáticas</span>
+                  <span class="small text-muted-qt text-nowrap"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>20 min</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-derivadas">Derivadas: reglas básicas</a></h3>
+                <p class="small text-muted-qt mb-2">por @luis_m</p>
+                <p class="mb-3"><span class="tag me-2">#calculo</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>10 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>14<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>37<span class="visually-hidden"> intentos</span></span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Certificaciones</span>
+                  <span class="small text-muted-qt text-nowrap"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i>10 min</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-osi">Redes: modelo OSI</a></h3>
+                <p class="small text-muted-qt mb-2">por @ricardo_e</p>
+                <p class="mb-3"><span class="tag me-2">#redes</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>8 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>11<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>29<span class="visually-hidden"> intentos</span></span>
+                  <span class="badge text-bg-light border">Varias respuestas</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card quiz-card h-100">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge badge-cat">Programación</span>
+                  <span class="small text-muted-qt text-nowrap">Sin límite</span>
+                </div>
+                <h3 class="h6 card-title mb-1"><a class="stretched-link" href="quiz.html?id=q-git">Git desde cero</a></h3>
+                <p class="small text-muted-qt mb-2">por @ana_dev</p>
+                <p class="mb-3"><span class="tag me-2">#git</span></p>
+                <div class="mt-auto d-flex flex-wrap gap-3 small">
+                  <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i>8 preguntas</span>
+                  <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i>9<span class="visually-hidden"> likes</span></span>
+                  <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i>23<span class="visually-hidden"> intentos</span></span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+        </div>
+
+        <!-- Paginación: se arma con page y totalPages de la respuesta -->
+        <nav class="mt-4" aria-label="Paginación de resultados" data-show-if="totalPages > 1">
+          <ul class="pagination justify-content-center" data-list="pages">
+            <li class="page-item disabled"><a class="page-link" href="#" tabindex="-1" aria-disabled="true"><span aria-hidden="true">&laquo;</span><span class="visually-hidden">Anterior</span></a></li>
+            <li class="page-item active"><a class="page-link" href="index.html?q=sort%3Apopulares&amp;page=1" aria-current="page">1</a></li>
+            <li class="page-item"><a class="page-link" href="index.html?q=sort%3Apopulares&amp;page=2">2</a></li>
+            <li class="page-item"><a class="page-link" href="index.html?q=sort%3Apopulares&amp;page=3">3</a></li>
+            <li class="page-item"><a class="page-link" href="index.html?q=sort%3Apopulares&amp;page=2"><span aria-hidden="true">&raquo;</span><span class="visually-hidden">Siguiente</span></a></li>
+          </ul>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ===== Plantillas para JS (no se muestran) ===== -->
+
+    <!-- Una tarjeta por elemento de items[] -->
+    <template id="tpl-quiz-card">
+      <div class="col">
+        <article class="card quiz-card h-100">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <span class="badge badge-cat" data-bind="category.name"></span>
+              <span class="small text-muted-qt text-nowrap" data-show-if="timeLimit"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i><span data-bind="timeLimit"></span> min</span>
+              <span class="small text-muted-qt text-nowrap" data-show-if="!timeLimit">Sin límite</span>
+            </div>
+            <h3 class="h6 card-title mb-1"><a class="stretched-link" data-href="quiz.html?id={quizId}" data-bind="title"></a></h3>
+            <p class="small text-muted-qt mb-2">por @<span data-bind="owner.username"></span></p>
+            <p class="mb-3" data-list="tags" data-template="tpl-tag"></p>
+            <div class="mt-auto d-flex flex-wrap gap-3 small">
+              <span class="stat"><i class="bi bi-question-circle" aria-hidden="true"></i><span data-bind="questionCount"></span> preguntas</span>
+              <span class="stat"><i class="bi bi-heart-fill text-danger" aria-hidden="true"></i><span data-bind="likesCount"></span><span class="visually-hidden"> likes</span></span>
+              <span class="stat"><i class="bi bi-play-circle" aria-hidden="true"></i><span data-bind="playCount"></span><span class="visually-hidden"> intentos</span></span>
+              <span class="badge text-bg-light border" data-show-if="hasMultiple">Varias respuestas</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
+
+    <template id="tpl-tag"><span class="tag me-2">#<span data-bind="name"></span></span></template>
+
+    <!-- Un chip por categoría de GET /api/categories. aria-current="true" en la activa -->
+    <template id="tpl-category-chip"><a class="chip" data-href="index.html?q=categoria:{slug}" data-bind="name"></a></template>
+  </main>
+
+  <footer class="site-footer py-4 mt-5">
+    <div class="container d-flex flex-column flex-sm-row justify-content-between gap-2">
+      <span>© 2026 Quiztopia · ITESO · Desarrollo de aplicaciones y servicios web</span>
+      <a class="link-secondary" href="estados.html">Guía de estados y componentes</a>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS oficial: menú móvil, dropdowns, pestañas, plegables y modales -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Siguiente etapa (JS): descomentar al implementar la página
+  <script type="module" src="js/pages/catalogo.js"></script> -->
+</body>
+</html>

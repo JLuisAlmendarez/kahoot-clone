@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Álgebra lineal: matrices · Quiztopia</title>
+  <meta name="description" content="Detalle del quiz, versiones, likes y foro">
+  <!-- Bootstrap por CDN. Al activar helmet (CSP), muévanlo a public/vendor/ -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip-link visually-hidden-focusable" href="#main">Saltar al contenido</a>
+
+  <!-- ===== Navbar global (pantalla 1) =====
+       GET /api/auth/me decide qué bloque se muestra:
+       data-show-if="session" (con sesión) o data-show-if="!session" (visitante). -->
+  <header>
+    <nav class="navbar navbar-expand-md bg-white border-bottom sticky-top" aria-label="Principal">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="index.html"><span class="brand-mark" aria-hidden="true"><i class="bi bi-patch-question-fill"></i></span>Quiztopia</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav me-auto mb-2 mb-md-0">
+            <li class="nav-item"><a class="nav-link active" aria-current="page" href="index.html"><i class="bi bi-compass me-1" aria-hidden="true"></i>Explorar</a></li>
+            <li class="nav-item" data-show-if="session"><a class="nav-link" href="editor.html"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Crear quiz</a></li>
+          </ul>
+
+          <div class="dropdown" data-show-if="session">
+            <button class="btn btn-light d-flex align-items-center gap-2 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="avatar" aria-hidden="true" data-bind="me.initials">AN</span><span>@<span data-bind="me.username">ana_dev</span></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="perfil.html?tab=creados"><i class="bi bi-collection me-2" aria-hidden="true"></i>Quizzes creados</a></li>
+              <li><a class="dropdown-item" href="perfil.html?tab=participados"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Quizzes participados</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item" type="button" data-action="logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
+            </ul>
+          </div>
+
+          <div class="nav-visitor" data-show-if="!session" hidden>
+            <a class="btn btn-outline-primary flex-fill" href="acceso.html?modo=login" data-action="go-login">Iniciar sesión</a>
+            <a class="btn btn-primary flex-fill" href="acceso.html?modo=registro" data-action="go-register">Registrarse</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ===== Pantallas 4 y 5: Detalle de quiz + Versiones + Likes + Foro (ruta /quiz/:id) =====
+       API: GET /api/quizzes/:id (likesCount, likedByMe, canLike, canComment, isOwner, completed)
+            GET /api/quizzes/:id/versions · GET /api/versions/:versionId   (propuestos, ver GUIA.md)
+            POST|DELETE /api/quizzes/:id/likes · POST /api/quizzes/:id/attempts
+            GET /api/quizzes/:id/comments · GET /api/comments/:id/replies
+            POST /api/quizzes/:id/comments · DELETE /api/comments/:id
+       Estado mostrado: @ana_dev con sesión, YA completó el quiz y NO es la dueña (el dueño es @luis_m).
+       Las variantes de otros perfiles están en el HTML con el atributo hidden y data-show-if. -->
+  <main id="main" tabindex="-1" class="container py-4" data-region="quiz">
+
+    <div data-state="loading" hidden>
+      <div aria-busy="true">
+          <div class="state py-4"><div class="spinner-border text-primary" aria-hidden="true"></div></div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+    </div>
+    <div data-state="error" hidden>
+      <div class="state state-error" role="alert">
+          <i class="bi bi-wifi-off state-icon" aria-hidden="true"></i>
+          <p class="h5">Algo salió mal</p>
+          <p class="text-muted-qt">No pudimos cargar el quiz. Revisa tu conexión e inténtalo de nuevo.</p>
+          <button type="button" class="btn btn-outline-primary" data-action="retry"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reintentar</button>
+        </div>
+    </div>
+    <!-- 404: el quiz no existe o fue eliminado -->
+    <div data-state="empty" hidden>
+      <div class="state">
+        <i class="bi bi-question-octagon state-icon" aria-hidden="true"></i>
+        <p class="h5">Este quiz no existe o fue eliminado</p>
+        <p class="text-muted-qt">Si lo jugaste, tus intentos siguen en tu perfil durante 3 meses.</p>
+        <a class="btn btn-primary" href="index.html">Ir al catálogo</a>
+      </div>
+    </div>
+
+    <div data-state="content">
+      <nav aria-label="Ruta de navegación">
+        <ol class="breadcrumb small">
+          <li class="breadcrumb-item"><a href="index.html">Explorar</a></li>
+          <li class="breadcrumb-item"><a href="index.html?q=categoria:matematicas" data-href="index.html?q=categoria:{category.slug}" data-bind="category.name">Matemáticas</a></li>
+          <li class="breadcrumb-item active" aria-current="page" data-bind="title">Álgebra lineal: matrices</li>
+        </ol>
+      </nav>
+
+      <div class="row g-4">
+        <!-- ===== Columna principal ===== -->
+        <div class="col-lg-8">
+          <article>
+            <span class="badge badge-cat mb-2" data-bind="category.name">Matemáticas</span>
+            <h1 class="h2 fw-bold" data-bind="title">Álgebra lineal: matrices</h1>
+            <div class="quiz-meta mb-3">
+              <span><i class="bi bi-person-circle me-1" aria-hidden="true"></i>por <a href="index.html?q=autor:luis_m" data-href="index.html?q=autor:{owner.username}">@<span data-bind="owner.username">luis_m</span></a></span>
+              <span><i class="bi bi-calendar3 me-1" aria-hidden="true"></i><time datetime="2026-09-20" data-bind="createdAt">20 sep 2026</time></span>
+              <span><i class="bi bi-layers me-1" aria-hidden="true"></i>Versión <span data-bind="version">3</span></span>
+            </div>
+            <p class="mb-3" data-list="tags" data-template="tpl-tag-link">
+              <a class="tag me-2" href="index.html?q=etiqueta:algebra">#algebra</a>
+            </p>
+
+            <!-- Aviso «Varias respuestas»: hasMultiple = alguna pregunta de la versión vigente tiene más de una correcta -->
+            <div class="alert alert-info d-flex gap-2 align-items-start small" role="note" data-show-if="hasMultiple">
+              <i class="bi bi-ui-checks mt-1" aria-hidden="true"></i>
+              <div><strong>Varias respuestas.</strong> Algunas preguntas tienen más de una opción correcta: debes marcar todas para obtener el punto.</div>
+            </div>
+
+            <!-- Descripción: Markdown → marked.parse() → DOMPurify.sanitize() → innerHTML -->
+            <div class="card">
+              <div class="card-body markdown-body" data-bind-markdown="description">
+                <p>Repaso de <strong>determinantes</strong>, matrices inversas y operaciones elementales por renglón.</p>
+                <ul>
+                  <li>Propiedades del determinante</li>
+                  <li>Cuándo una matriz es invertible</li>
+                  <li>Método de Gauss-Jordan</li>
+                </ul>
+                <p>Ideal antes del primer parcial de Álgebra Lineal.</p>
+              </div>
+            </div>
+          </article>
+
+          <!-- ===== Historial de versiones (snapshots) =====
+               Editar preguntas, opciones o límite de tiempo crea una versión nueva; las anteriores no cambian.
+               Lo ve cualquiera; las respuestas correctas solo se marcan para el dueño. -->
+          <section id="versiones" class="mt-4" aria-labelledby="versiones-title" data-region="versions">
+            <h2 id="versiones-title" class="h5 mb-1"><i class="bi bi-layers me-2" aria-hidden="true"></i>Historial de versiones</h2>
+            <p class="small text-muted-qt mb-3">Cada edición del contenido genera un snapshot nuevo. Las versiones anteriores se conservan tal como estaban para revisar los intentos que se hicieron con ellas.</p>
+
+            <div data-state="loading" hidden>
+              <div aria-busy="true">
+          <div class="d-flex gap-3 py-3"><span class="skeleton skeleton-avatar flex-shrink-0"></span>
+              <div class="flex-grow-1"><span class="skeleton skeleton-text w-25 mb-2"></span><span class="skeleton skeleton-text w-75"></span></div></div>
+          <div class="d-flex gap-3 py-3"><span class="skeleton skeleton-avatar flex-shrink-0"></span>
+              <div class="flex-grow-1"><span class="skeleton skeleton-text w-25 mb-2"></span><span class="skeleton skeleton-text w-75"></span></div></div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+            </div>
+            <div data-state="error" hidden>
+              <div class="state state-error" role="alert">
+          <i class="bi bi-wifi-off state-icon" aria-hidden="true"></i>
+          <p class="h5">Algo salió mal</p>
+          <p class="text-muted-qt">No pudimos cargar las versiones.</p>
+          <button type="button" class="btn btn-outline-primary" data-action="retry"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reintentar</button>
+        </div>
+            </div>
+
+            <div class="card" data-state="content">
+              <ul class="list-group list-group-flush" data-list="versions" data-template="tpl-version-row">
+                <li class="list-group-item py-3">
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <strong>Versión 3</strong> <span class="badge text-bg-primary">Vigente</span>
+                    <span class="small text-muted-qt">25 sep 2026, 18:00</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#modal-version" data-action="open-version">
+                      <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver snapshot<span class="visually-hidden"> de la versión 3</span>
+                    </button>
+                  </div>
+                  <p class="small mb-1 mt-2"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Cambió la pregunta 1 y agregó la pregunta 10 · Límite de tiempo: 20 → 30 min</p>
+                  <p class="small text-muted-qt mb-0">10 preguntas · 30 min · 18 intentos con esta versión</p>
+                </li>
+                <li class="list-group-item py-3">
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <strong>Versión 2</strong> <span class="badge text-bg-light border">Anterior</span>
+                    <span class="small text-muted-qt">22 sep 2026, 12:30</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#modal-version" data-action="open-version">
+                      <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver snapshot<span class="visually-hidden"> de la versión 2</span>
+                    </button>
+                  </div>
+                  <p class="small mb-1 mt-2"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Agregó la opción «det(A) = −5» a la pregunta 1 · Corrigió la explicación de la pregunta 3</p>
+                  <p class="small text-muted-qt mb-0">9 preguntas · 20 min · 15 intentos con esta versión</p>
+                </li>
+                <li class="list-group-item py-3">
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <strong>Versión 1</strong> <span class="badge text-bg-light border">Original</span>
+                    <span class="small text-muted-qt">20 sep 2026, 15:04</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#modal-version" data-action="open-version">
+                      <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver snapshot<span class="visually-hidden"> de la versión 1</span>
+                    </button>
+                  </div>
+                  <p class="small mb-1 mt-2"><i class="bi bi-flag me-1" aria-hidden="true"></i>Versión original</p>
+                  <p class="small text-muted-qt mb-0">9 preguntas · 20 min · 9 intentos con esta versión</p>
+                </li>
+              </ul>
+            </div>
+            <p class="small text-muted-qt mt-2 mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Cambiar solo el título, la descripción, la categoría o las etiquetas no crea una versión nueva.</p>
+          </section>
+        </div>
+
+        <!-- ===== Columna lateral: acciones ===== -->
+        <aside class="col-lg-4" aria-label="Acciones del quiz">
+          <div class="card sticky-aside">
+            <div class="card-body">
+              <ul class="stat-list mb-3">
+                <li><strong data-bind="questionCount">10</strong><span>preguntas</span></li>
+                <li data-show-if="timeLimit"><strong><span data-bind="timeLimit">30</span> min</strong><span>límite de tiempo</span></li>
+                <li data-show-if="!timeLimit" hidden><strong>—</strong><span>sin límite de tiempo</span></li>
+                <li><strong data-bind="likesCount">17</strong><span>likes</span></li>
+                <li><strong data-bind="playCount">42</strong><span>intentos</span></li>
+              </ul>
+
+              <!-- Jugar: con sesión hace POST /api/quizzes/:id/attempts y abre jugar.html?attempt={attemptId} -->
+              <button type="button" class="btn btn-primary btn-lg w-100 mb-2" data-action="play" data-show-if="session">
+                <i class="bi bi-play-fill me-1" aria-hidden="true"></i><span data-show-if="completed">Jugar de nuevo</span><span data-show-if="!completed" hidden>Jugar</span>
+              </button>
+              <!-- Visitante: primero inicia sesión y regresa a este quiz -->
+              <a class="btn btn-primary btn-lg w-100 mb-2" href="acceso.html?modo=login&amp;next=quiz.html%3Fid%3Dq-algebra" data-show-if="!session" hidden>
+                <i class="bi bi-play-fill me-1" aria-hidden="true"></i>Jugar
+              </a>
+              <p class="small text-muted-qt text-center mb-3">
+                <span data-show-if="timeLimit">El cronómetro empieza al pulsar Jugar. </span>Si cierras la pestaña, el intento queda interrumpido.
+              </p>
+
+              <!-- Like: aria-pressed = likedByMe; disabled cuando canLike es false -->
+              <button class="btn btn-like w-100" type="button" aria-pressed="true" aria-describedby="like-help" data-action="toggle-like">
+                <i class="bi bi-heart-fill me-1" aria-hidden="true"></i><span data-show-if="likedByMe">Te gusta</span><span data-show-if="!likedByMe" hidden>Me gusta</span>
+              </button>
+              <p id="like-help" class="small text-muted-qt mt-2 mb-0">
+                <span data-show-if="canLike">¿Te sirvió? Tu like ayuda a que más gente lo encuentre.</span>
+                <span data-show-if="!session" hidden>Inicia sesión y completa el quiz para darle like.</span>
+                <span data-show-if="session && !isOwner && !completed" hidden>Completa el quiz para poder darle like.</span>
+                <span data-show-if="isOwner" hidden>No puedes dar like a tu propio quiz.</span>
+              </p>
+
+              <!-- Solo el dueño -->
+              <div data-show-if="isOwner" hidden>
+                <hr>
+                <p class="small fw-semibold mb-2">Eres el creador de este quiz</p>
+                <div class="d-flex gap-2">
+                  <a class="btn btn-outline-primary flex-fill" href="editor.html?id=q-algebra" data-href="editor.html?id={quizId}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</a>
+                  <button class="btn btn-outline-danger flex-fill" type="button" data-bs-toggle="modal" data-bs-target="#modal-borrar"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Borrar</button>
+                </div>
+              </div>
+
+              <hr>
+              <a class="btn btn-outline-primary w-100" href="#versiones"><i class="bi bi-layers me-1" aria-hidden="true"></i>Historial de versiones (<span data-bind="version">3</span>)</a>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ===== Foro del quiz ===== -->
+      <section id="foro" class="mt-5" aria-labelledby="foro-title" data-region="comments">
+        <div class="row">
+          <div class="col-lg-8">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <h2 id="foro-title" class="h4 mb-0"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Foro</h2>
+              <span class="badge rounded-pill text-bg-light border"><span data-bind="total">5</span> hilos</span>
+            </div>
+
+            <!-- Caja de comentario: solo si canComment (completó el quiz o es el dueño) -->
+            <form action="#" method="post" class="mb-3" data-form="comment" data-show-if="canComment">
+              <label class="visually-hidden" for="new-comment">Escribe un comentario</label>
+              <textarea class="form-control" id="new-comment" name="body" rows="3" minlength="1" maxlength="1000" required
+                        placeholder="¿Tienes una duda sobre alguna pregunta? Escríbela aquí…" aria-describedby="new-comment-help"></textarea>
+              <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+                <small id="new-comment-help" class="text-muted-qt"><i class="bi bi-markdown me-1" aria-hidden="true"></i>Admite Markdown · <span data-bind="bodyLength">0</span>/1000</small>
+                <button type="submit" class="btn btn-sm btn-primary">Publicar</button>
+              </div>
+            </form>
+            <!-- Sin permiso para comentar (visitante o no ha completado el quiz) -->
+            <div class="alert alert-light border d-flex gap-2 align-items-center mb-3" data-show-if="!canComment" hidden>
+              <i class="bi bi-lock" aria-hidden="true"></i>
+              <span>Completa el quiz para participar en el foro. Mientras tanto, puedes leer los comentarios.</span>
+            </div>
+
+            <div data-state="loading" hidden>
+              <div aria-busy="true">
+          <div class="d-flex gap-3 py-3"><span class="skeleton skeleton-avatar flex-shrink-0"></span>
+              <div class="flex-grow-1"><span class="skeleton skeleton-text w-25 mb-2"></span><span class="skeleton skeleton-text w-75"></span></div></div>
+          <div class="d-flex gap-3 py-3"><span class="skeleton skeleton-avatar flex-shrink-0"></span>
+              <div class="flex-grow-1"><span class="skeleton skeleton-text w-25 mb-2"></span><span class="skeleton skeleton-text w-75"></span></div></div>
+          <div class="d-flex gap-3 py-3"><span class="skeleton skeleton-avatar flex-shrink-0"></span>
+              <div class="flex-grow-1"><span class="skeleton skeleton-text w-25 mb-2"></span><span class="skeleton skeleton-text w-75"></span></div></div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+            </div>
+            <div data-state="error" hidden>
+              <div class="state state-error" role="alert">
+          <i class="bi bi-wifi-off state-icon" aria-hidden="true"></i>
+          <p class="h5">Algo salió mal</p>
+          <p class="text-muted-qt">No pudimos cargar el foro.</p>
+          <button type="button" class="btn btn-outline-primary" data-action="retry"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reintentar</button>
+        </div>
+            </div>
+            <div data-state="empty" hidden>
+              <div class="state">
+          <i class="bi bi-chat-dots state-icon" aria-hidden="true"></i>
+          <p class="h5">Aún no hay comentarios</p>
+          <p class="text-muted-qt mb-0">Cuando alguien comente, lo verás aquí.</p>
+        </div>
+            </div>
+
+            <div data-state="content">
+              <div class="card">
+                <div class="card-body py-0" data-list="items" data-template="tpl-comment">
+
+                  <!-- Comentario con respuestas (abiertas) -->
+                  <article class="comment">
+                    <div class="d-flex gap-2">
+                      <span class="avatar" aria-hidden="true">GA</span>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small mb-1"><strong>@gael_jv</strong><span class="text-muted-qt"> · <time datetime="2026-10-01T10:30">1 oct 2026, 10:30</time></span></div>
+                        <div class="markdown-body mb-1"><p>No entiendo la pregunta 4, ¿por qué una matriz con determinante 0 no tiene inversa?</p></div>
+                        <div class="d-flex flex-wrap gap-3">
+                          <button type="button" class="btn-text" data-bs-toggle="collapse" data-bs-target="#reply-form-c1" aria-expanded="false" aria-controls="reply-form-c1"><i class="bi bi-reply me-1" aria-hidden="true"></i>Responder</button>
+                          <button type="button" class="btn-text" data-bs-toggle="collapse" data-bs-target="#replies-c1" aria-expanded="true" aria-controls="replies-c1"><i class="bi bi-chevron-down me-1" aria-hidden="true"></i>2 respuestas</button>
+                        </div>
+                        <div class="collapse" id="reply-form-c1">
+                          <form action="#" method="post" class="mt-2" data-form="reply">
+                            <label class="visually-hidden" for="reply-c1">Escribe tu respuesta</label>
+                            <textarea class="form-control" id="reply-c1" name="body" rows="2" maxlength="1000" placeholder="Escribe tu respuesta…"></textarea>
+                            <div class="d-flex justify-content-end gap-2 mt-2">
+                              <button type="button" class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#reply-form-c1">Cancelar</button>
+                              <button type="submit" class="btn btn-sm btn-primary">Responder</button>
+                            </div>
+                          </form>
+                        </div>
+                        <div class="collapse show" id="replies-c1">
+                          <div class="replies">
+                            <article class="comment">
+                              <div class="d-flex gap-2">
+                                <span class="avatar" aria-hidden="true">RI</span>
+                                <div class="flex-grow-1 min-w-0">
+                                  <div class="small mb-1"><strong>@ricardo_e</strong><span class="text-muted-qt"> · <time datetime="2026-10-01T11:02">1 oct 2026, 11:02</time></span></div>
+                                  <div class="markdown-body"><p>Porque <code>A⁻¹ = adj(A) / det(A)</code> y no se puede dividir entre 0.</p></div>
+                                </div>
+                              </div>
+                            </article>
+                            <article class="comment">
+                              <div class="d-flex gap-2">
+                                <span class="avatar" aria-hidden="true">LU</span>
+                                <div class="flex-grow-1 min-w-0">
+                                  <div class="small mb-1"><strong>@luis_m</strong> <span class="badge text-bg-primary">Creador</span><span class="text-muted-qt"> · <time datetime="2026-10-01T12:15">1 oct 2026, 12:15</time></span></div>
+                                  <div class="markdown-body"><p>Exacto. Agregué esa explicación en la versión 3 👍</p></div>
+                                </div>
+                              </div>
+                            </article>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <!-- Comentario propio: se puede borrar -->
+                  <article class="comment">
+                    <div class="d-flex gap-2">
+                      <span class="avatar" aria-hidden="true">AN</span>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small mb-1"><strong>@ana_dev</strong><span class="text-muted-qt"> · <time datetime="2026-10-05T19:00">5 oct 2026, 19:00</time></span></div>
+                        <div class="markdown-body mb-1"><p>Muy buen repaso. Me faltaría una pregunta sobre <strong>matrices ortogonales</strong>.</p></div>
+                        <div class="d-flex flex-wrap gap-3">
+                          <button type="button" class="btn-text" data-bs-toggle="collapse" data-bs-target="#reply-form-c2" aria-expanded="false" aria-controls="reply-form-c2"><i class="bi bi-reply me-1" aria-hidden="true"></i>Responder</button>
+                          <button type="button" class="btn-text text-danger" data-bs-toggle="modal" data-bs-target="#modal-borrar-comentario"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Borrar</button>
+                        </div>
+                        <div class="collapse" id="reply-form-c2">
+                          <form action="#" method="post" class="mt-2" data-form="reply">
+                            <label class="visually-hidden" for="reply-c2">Escribe tu respuesta</label>
+                            <textarea class="form-control" id="reply-c2" name="body" rows="2" maxlength="1000" placeholder="Escribe tu respuesta…"></textarea>
+                            <div class="d-flex justify-content-end gap-2 mt-2">
+                              <button type="button" class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#reply-form-c2">Cancelar</button>
+                              <button type="submit" class="btn btn-sm btn-primary">Responder</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <!-- Comentario eliminado que conserva sus respuestas -->
+                  <article class="comment">
+                    <div class="d-flex gap-2">
+                      <span class="avatar" aria-hidden="true"><i class="bi bi-dash"></i></span>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small mb-1"><span class="text-muted-qt">Usuario · <time datetime="2026-10-03T14:00">3 oct 2026, 14:00</time></span></div>
+                        <p class="comment-deleted mb-1">[comentario eliminado]</p>
+                        <div class="d-flex flex-wrap gap-3">
+                          <button type="button" class="btn-text collapsed" data-bs-toggle="collapse" data-bs-target="#replies-c3" aria-expanded="false" aria-controls="replies-c3"><i class="bi bi-chevron-down me-1" aria-hidden="true"></i>1 respuesta</button>
+                        </div>
+                        <div class="collapse" id="replies-c3">
+                          <div class="replies">
+                            <article class="comment">
+                              <div class="d-flex gap-2">
+                                <span class="avatar" aria-hidden="true">LU</span>
+                                <div class="flex-grow-1 min-w-0">
+                                  <div class="small mb-1"><strong>@luis_m</strong> <span class="badge text-bg-primary">Creador</span><span class="text-muted-qt"> · <time datetime="2026-10-03T15:00">3 oct 2026, 15:00</time></span></div>
+                                  <div class="markdown-body"><p>Creo que se refería a la pregunta 2.</p></div>
+                                </div>
+                              </div>
+                            </article>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                </div>
+              </div>
+              <!-- Paginación por "cargar más": visible mientras page < totalPages -->
+              <div class="text-center mt-3" data-show-if="page < totalPages">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-action="load-more">Cargar más comentarios</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===== Plantillas para JS (no se muestran) ===== -->
+
+    <template id="tpl-tag-link"><a class="tag me-2" data-href="index.html?q=etiqueta:{slug}">#<span data-bind="name"></span></a></template>
+
+    <!-- Una fila por versión de GET /api/quizzes/:id/versions (de la más nueva a la más vieja) -->
+    <template id="tpl-version-row">
+      <li class="list-group-item py-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <strong>Versión <span data-bind="version"></span></strong>
+          <span class="badge text-bg-primary" data-show-if="isCurrent">Vigente</span>
+          <span class="badge text-bg-light border" data-show-if="!isCurrent">Anterior</span>
+          <span class="small text-muted-qt" data-bind="createdAt"></span>
+          <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#modal-version" data-action="open-version">
+            <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver snapshot
+          </button>
+        </div>
+        <p class="small mb-1 mt-2"><i class="bi bi-pencil me-1" aria-hidden="true"></i><span data-bind="changeSummary"></span></p>
+        <p class="small text-muted-qt mb-0"><span data-bind="questionCount"></span> preguntas · <span data-bind="timeLimitLabel"></span> · <span data-bind="attemptCount"></span> intentos con esta versión</p>
+      </li>
+    </template>
+
+    <!-- Comentario de primer nivel (items[] de GET /api/quizzes/:id/comments) -->
+    <template id="tpl-comment">
+      <article class="comment">
+        <div class="d-flex gap-2">
+          <span class="avatar" aria-hidden="true" data-bind="author.initials"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="small mb-1">
+              <strong data-show-if="!deleted">@<span data-bind="author.username"></span></strong>
+              <span class="text-muted-qt" data-show-if="deleted">Usuario</span>
+              <span class="badge text-bg-primary" data-show-if="isQuizOwner">Creador</span>
+              <span class="text-muted-qt"> · <time data-bind="createdAt"></time></span>
+            </div>
+            <div class="markdown-body mb-1" data-show-if="!deleted" data-bind-markdown="body"></div>
+            <p class="comment-deleted mb-1" data-show-if="deleted">[comentario eliminado]</p>
+            <div class="d-flex flex-wrap gap-3">
+              <button type="button" class="btn-text" data-action="reply" data-show-if="canComment && !deleted"><i class="bi bi-reply me-1" aria-hidden="true"></i>Responder</button>
+              <button type="button" class="btn-text text-danger" data-action="delete-comment" data-show-if="isMine && !deleted"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Borrar</button>
+              <button type="button" class="btn-text" data-action="toggle-replies" data-show-if="replyCount"><i class="bi bi-chevron-down me-1" aria-hidden="true"></i><span data-bind="replyCount"></span> respuestas</button>
+            </div>
+            <div data-slot="reply-form"></div>
+            <div class="replies" data-list="replies" data-template="tpl-reply" hidden></div>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <!-- Respuesta (segundo nivel, GET /api/comments/:id/replies) -->
+    <template id="tpl-reply">
+      <article class="comment">
+        <div class="d-flex gap-2">
+          <span class="avatar" aria-hidden="true" data-bind="author.initials"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="small mb-1">
+              <strong>@<span data-bind="author.username"></span></strong>
+              <span class="badge text-bg-primary" data-show-if="isQuizOwner">Creador</span>
+              <span class="text-muted-qt"> · <time data-bind="createdAt"></time></span>
+            </div>
+            <div class="markdown-body" data-bind-markdown="body"></div>
+            <button type="button" class="btn-text text-danger mt-1" data-action="delete-comment" data-show-if="isMine"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Borrar</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <!-- Formulario de respuesta que se inserta en data-slot="reply-form" -->
+    <template id="tpl-reply-form">
+      <form action="#" method="post" class="mt-2" data-form="reply">
+        <label class="visually-hidden">Escribe tu respuesta</label>
+        <textarea class="form-control" name="body" rows="2" maxlength="1000" placeholder="Escribe tu respuesta…" required></textarea>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+          <button type="button" class="btn btn-sm btn-light" data-action="cancel-reply">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-primary">Responder</button>
+        </div>
+      </form>
+    </template>
+
+    <!-- Pregunta dentro del snapshot de una versión -->
+    <template id="tpl-version-question">
+      <article class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+            <span class="section-label">Pregunta <span data-bind="position"></span></span>
+            <span class="badge bg-warning-subtle text-warning-emphasis" data-show-if="change === 'modified'"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Modificada en esta versión</span>
+            <span class="badge bg-success-subtle text-success-emphasis" data-show-if="change === 'new'"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Nueva en esta versión</span>
+          </div>
+          <div class="fw-semibold mb-3 markdown-body" data-bind-markdown="text"></div>
+          <ul class="list-unstyled mb-0" data-list="options" data-template="tpl-version-option"></ul>
+        </div>
+      </article>
+    </template>
+    <!-- Para el dueño, agregar la clase "correct" cuando isCorrect venga en la respuesta -->
+    <template id="tpl-version-option">
+      <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span data-bind="text"></span><small class="ms-auto text-success fw-semibold" data-show-if="isCorrect">Correcta</small></li>
+    </template>
+  </main>
+
+  <!-- ===== Modal: snapshot de una versión (uno solo, se llena con GET /api/versions/:versionId) =====
+       En la maqueta muestra la versión 2 como ejemplo. -->
+  <div class="modal fade" id="modal-version" tabindex="-1" aria-labelledby="modal-version-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="modal-version-title"><span data-bind="quiz.title">Álgebra lineal: matrices</span> · Versión <span data-bind="version">2</span></h2>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              <span class="badge text-bg-light border" data-bind="createdAt">22 sep 2026, 12:30</span>
+              <span class="badge text-bg-light border"><i class="bi bi-stopwatch me-1" aria-hidden="true"></i><span data-bind="timeLimitLabel">20 min</span></span>
+              <span class="badge text-bg-light border"><span data-bind="questionCount">9</span> preguntas</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body bg-body-tertiary" data-region="version-detail">
+          <div data-state="loading" hidden>
+            <div aria-busy="true">
+          <div class="state py-4"><div class="spinner-border text-primary" aria-hidden="true"></div></div>
+          <span class="visually-hidden" role="status">Cargando…</span>
+        </div>
+          </div>
+          <div data-state="content">
+            <div class="alert alert-primary d-flex gap-2 small" role="note">
+              <i class="bi bi-camera mt-1" aria-hidden="true"></i>
+              <div><strong>Snapshot de la versión <span data-bind="version">2</span>.</strong> Ya no se juega, pero se conserva así para revisar los <span data-bind="attemptCount">15</span> intentos que se hicieron con ella. Las preguntas marcadas cambiaron respecto a la versión anterior.</div>
+            </div>
+            <div data-list="questions" data-template="tpl-version-question">
+              <article class="card mb-3 border-warning">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between flex-wrap gap-2 mb-2"><span class="section-label">Pregunta 1</span><span class="badge bg-warning-subtle text-warning-emphasis"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Modificada en esta versión</span></div>
+                  <p class="fw-semibold mb-3">¿Qué matrices son <strong>invertibles</strong>?</p>
+                  <ul class="list-unstyled mb-0">
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>det(A) = 2</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>det(A) = 0</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>det(A) = −5</span></li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between flex-wrap gap-2 mb-2"><span class="section-label">Pregunta 2</span></div>
+                  <p class="fw-semibold mb-3">¿Cuál es el determinante de la matriz identidad de 3×3?</p>
+                  <ul class="list-unstyled mb-0">
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>1</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>0</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>3</span></li>
+                  </ul>
+                </div>
+              </article>
+              <article class="card mb-3 border-warning">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between flex-wrap gap-2 mb-2"><span class="section-label">Pregunta 3</span><span class="badge bg-warning-subtle text-warning-emphasis"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Modificada en esta versión</span></div>
+                  <p class="fw-semibold mb-3">Si intercambias dos renglones de una matriz, su determinante…</p>
+                  <ul class="list-unstyled mb-0">
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>No cambia</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>Cambia de signo</span></li>
+                    <li class="review-opt"><i class="bi bi-circle text-muted-qt" aria-hidden="true"></i><span>Se duplica</span></li>
+                  </ul>
+                </div>
+              </article>
+              <p class="small text-muted-qt text-center mb-0">Preguntas 4 a 9: sin cambios.</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: borrar quiz (solo dueño) -->
+  <div class="modal fade" id="modal-borrar" tabindex="-1" aria-labelledby="modal-borrar-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h2 class="modal-title h5" id="modal-borrar-title"><i class="bi bi-trash3 me-2 text-danger" aria-hidden="true"></i>¿Borrar este quiz?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p>Vas a borrar <strong data-bind="title">Álgebra lineal: matrices</strong>.</p>
+          <ul class="small text-muted-qt ps-3 mb-0">
+            <li>Desaparece del catálogo de inmediato y ya nadie podrá jugarlo ni editarlo.</li>
+            <li>Quienes lo jugaron podrán consultar sus intentos durante <strong>3 meses</strong>.</li>
+            <li>Después, los intentos, likes y el foro se eliminan por completo.</li>
+          </ul>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" data-action="confirm-delete-quiz">Sí, borrar quiz</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: borrar comentario propio -->
+  <div class="modal fade" id="modal-borrar-comentario" tabindex="-1" aria-labelledby="modal-borrar-comentario-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h2 class="modal-title h5" id="modal-borrar-comentario-title">¿Borrar tu comentario?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Si ya tiene respuestas, se mostrará como <em>[comentario eliminado]</em> para no romper la conversación.</p>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" data-action="confirm-delete-comment">Borrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer py-4 mt-5">
+    <div class="container d-flex flex-column flex-sm-row justify-content-between gap-2">
+      <span>© 2026 Quiztopia · ITESO · Desarrollo de aplicaciones y servicios web</span>
+      <a class="link-secondary" href="estados.html">Guía de estados y componentes</a>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS oficial: menú móvil, dropdowns, pestañas, plegables y modales -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Siguiente etapa (JS): descomentar al implementar la página
+  <script type="module" src="js/pages/quiz.js"></script> -->
+</body>
+</html>
