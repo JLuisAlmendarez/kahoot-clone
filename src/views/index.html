@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiztopia</title>
+  <meta name="description" content="Crea quizzes, resuélvelos y comenta con la comunidad.">
+  <!-- Librerías servidas por Express desde node_modules (sin CDN, compatible con la CSP de helmet) -->
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <a class="skip-link visually-hidden-focusable" href="#main">Saltar al contenido</a>
+
+  <!-- Única página de la aplicación: el router pinta aquí cada vista con generate-html.js -->
+  <div id="app">
+    <div class="state py-5"><div class="spinner-border text-primary" aria-hidden="true"></div><span class="visually-hidden" role="status">Cargando…</span></div>
+  </div>
+
+  <div id="qt-toasts" class="toast-container position-fixed top-0 end-0 p-3 mt-5"></div>
+
+  <noscript><p class="container py-5">Quiztopia necesita JavaScript activado.</p></noscript>
+
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/vendor/marked/marked.min.js"></script>
+  <script src="/vendor/dompurify/purify.min.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
