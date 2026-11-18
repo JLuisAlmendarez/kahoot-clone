@@ -1,4 +1,5 @@
-import { Attempt, Quiz, QuizVersion } from '../models/index.js';
+import { Attempt, QuizVersion } from '../models/index.js';
+import * as quizRepository from '../repositories/quiz.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { parseId, pagination } from '../utils/http.js';
 import { iso } from '../utils/dates.js';
@@ -27,7 +28,7 @@ async function finishAttempt(attempt, { timedOut, finishedAt }) {
   );
   if (updated) {
     await Promise.all([
-      Quiz.updateOne({ _id: updated.quizId }, { $inc: { playCount: 1 } }),
+      quizRepository.incrementPlays(updated.quizId),
       QuizVersion.updateOne({ _id: updated.versionId }, { $inc: { attemptCount: 1 } }),
     ]);
   }
@@ -70,7 +71,7 @@ export async function start(req, res) {
 export async function play(req, res) {
   const attempt = await closeIfExpired(await ownAttempt(req.params.id, req.user));
   if (attempt.status !== AttemptStatus.IN_PROGRESS) throw ApiError.conflict('ATTEMPT_CLOSED', 'Este intento ya terminó');
-  const [version, quiz] = await Promise.all([QuizVersion.findById(attempt.versionId), Quiz.findById(attempt.quizId)]);
+  const [version, quiz] = await Promise.all([QuizVersion.findById(attempt.versionId), quizRepository.findById(attempt.quizId)]);
   res.json(sessionView(attempt, version, quiz));
 }
 
@@ -139,7 +140,7 @@ export async function review(req, res) {
   const attempt = await closeIfExpired(await ownAttempt(req.params.id, req.user));
   if (attempt.status === AttemptStatus.IN_PROGRESS) throw ApiError.conflict('ATTEMPT_OPEN', 'Este intento sigue en curso');
   if (attempt.status === AttemptStatus.ABANDONED) throw ApiError.conflict('ATTEMPT_ABANDONED', 'Los intentos interrumpidos no tienen revisión');
-  const [version, quiz] = await Promise.all([QuizVersion.findById(attempt.versionId), Quiz.findById(attempt.quizId)]);
+  const [version, quiz] = await Promise.all([QuizVersion.findById(attempt.versionId), quizRepository.findById(attempt.quizId)]);
   if (!version || !quiz) throw ApiError.notFound('Este intento no existe o su quiz fue eliminado');
   const byQuestion = new Map(attempt.answers.map((a) => [String(a.questionId), a]));
   const duration = Math.max(0, Math.round(((attempt.finishedAt || new Date()) - attempt.startedAt) / 60000));
@@ -173,7 +174,7 @@ export async function history(req, res) {
   const target = req.query.quizId ? parseId(req.query.quizId) : null;
   const mineList = await Attempt.find({ userId: me._id, status: { $ne: AttemptStatus.IN_PROGRESS } }).sort({ startedAt: -1 });
   const quizIds = [...new Set(mineList.map((a) => String(a.quizId)))];
-  const quizzes = new Map((await Quiz.find({ _id: { $in: quizIds } })).map((q) => [String(q._id), q]));
+  const quizzes = new Map((await quizRepository.findByIds(quizIds)).map((q) => [String(q._id), q]));
 
   const groups = [];
   const byQuiz = new Map();

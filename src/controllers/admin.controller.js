@@ -1,4 +1,5 @@
-import { User, Category, Quiz, Like, Comment, Attempt } from '../models/index.js';
+import { User, Category, Like, Comment, Attempt } from '../models/index.js';
+import * as quizRepository from '../repositories/quiz.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { parseId, pagination } from '../utils/http.js';
 import { Roles, slugify, normalize } from '../shared/rules.js';
@@ -42,10 +43,7 @@ export async function listUsers(req, res) {
     User.countDocuments({ role: Roles.ADMIN }),
   ]);
   // Cuántos quizzes vivos tiene cada usuario de la página (una sola consulta)
-  const counts = await Quiz.aggregate([
-    { $match: { 'owner.userId': { $in: users.map((u) => u._id) } } },
-    { $group: { _id: '$owner.userId', n: { $sum: 1 } } },
-  ]);
+  const counts = await quizRepository.countByOwners(users.map((u) => u._id));
   const byUser = new Map(counts.map((c) => [String(c._id), c.n]));
   res.json({
     items: users.map((u) => userView(u, req.user, byUser.get(String(u._id)) || 0)),
@@ -80,11 +78,11 @@ export async function updateUser(req, res) {
   await user.save(); // usuario o correo repetido → 409
   if (renamed) {
     await Promise.all([
-      Quiz.updateMany({ 'owner.userId': user._id }, { $set: { 'owner.username': user.username } }),
+      quizRepository.renameOwner(user._id, user.username),
       Comment.updateMany({ 'author.userId': user._id }, { $set: { 'author.username': user.username } }),
     ]);
   }
-  const quizCount = await Quiz.countDocuments({ 'owner.userId': user._id });
+  const quizCount = await quizRepository.countByOwner(user._id);
   res.json(userView(user, req.user, quizCount));
 }
 
@@ -99,14 +97,14 @@ export async function deleteUser(req, res) {
   const user = await findUser(req.params.id);
   if (String(user._id) === String(req.user._id)) throw ApiError.conflict('SELF_DELETE', 'No puedes borrar tu propia cuenta');
   if (user.role === Roles.ADMIN) throw ApiError.forbidden('No se pueden borrar cuentas de administrador');
-  const quizzes = await Quiz.countDocuments({ 'owner.userId': user._id });
+  const quizzes = await quizRepository.countByOwner(user._id);
   if (quizzes) throw ApiError.conflict('IN_USE', `No se puede borrar: tiene ${quizzes} quiz(zes); bórralos primero`);
 
   // Likes: cada like borrado resta 1 al quiz (condición > 0 por si hubo concurrencia)
   const likes = await Like.find({ userId: user._id }, 'quizId');
   for (const like of likes) {
     const r = await Like.deleteOne({ _id: like._id });
-    if (r.deletedCount) await Quiz.updateOne({ _id: like.quizId, likesCount: { $gt: 0 } }, { $inc: { likesCount: -1 } });
+    if (r.deletedCount) await quizRepository.decrementLikes(like.quizId);
   }
   // Comentarios: primero sus respuestas (restan replyCount al padre), luego los de primer nivel
   const replies = await Comment.find({ 'author.userId': user._id, parentId: { $ne: null } }, 'parentId');
@@ -141,10 +139,7 @@ export async function listQuizzes(req, res) {
   }
   if (categoria) filter['category.slug'] = categoria;
   const dir = order === 'asc' ? 1 : -1;
-  const [items, total] = await Promise.all([
-    Quiz.find(filter).collation({ locale: 'es' }).sort({ [QUIZ_SORT[sort]]: dir, _id: dir }).skip(skip).limit(limit),
-    Quiz.countDocuments(filter),
-  ]);
+  const [items, total] = await quizRepository.adminList(filter, { [QUIZ_SORT[sort]]: dir, _id: dir }, skip, limit);
   res.json({
     items: items.map((qz) => ({ ...qz.toCard(), version: qz.version, updatedAt: qz.updatedAt.toISOString() })),
     page, totalPages: Math.max(1, Math.ceil(total / limit)), total,
@@ -154,10 +149,7 @@ export async function listQuizzes(req, res) {
 // =============================================================== categorías
 /** Cuántos quizzes vivos usan cada categoría y cada etiqueta. */
 async function usage() {
-  const [cats, tags] = await Promise.all([
-    Quiz.aggregate([{ $group: { _id: '$category.categoryId', n: { $sum: 1 } } }]),
-    Quiz.aggregate([{ $unwind: '$tags' }, { $group: { _id: '$tags.tagId', n: { $sum: 1 } } }]),
-  ]);
+  const [cats, tags] = await Promise.all([quizRepository.countPerCategory(), quizRepository.countPerTag()]);
   return { cats: new Map(cats.map((c) => [String(c._id), c.n])), tags: new Map(tags.map((t) => [String(t._id), t.n])) };
 }
 
@@ -186,12 +178,6 @@ function assertUniqueTag(category, name, exceptId = null) {
   }
 }
 
-/** Recalcula el texto de búsqueda de los quizzes que usan una etiqueta renombrada. */
-async function refreshSearchText(filter) {
-  const quizzes = await Quiz.find(filter, 'title description tags');
-  await Promise.all(quizzes.map((q) => Quiz.updateOne({ _id: q._id }, { $set: { searchText: Quiz.searchTextFor(q) } })));
-}
-
 /** GET /api/admin/categories — con el número de quizzes que usan cada una */
 export async function listCategories(req, res) {
   const [categories, u] = await Promise.all([Category.find().sort({ name: 1 }), usage()]);
@@ -213,14 +199,14 @@ export async function renameCategory(req, res) {
   category.name = req.body.name;
   category.slug = slugify(req.body.name);
   await category.save();
-  await Quiz.updateMany({ 'category.categoryId': category._id }, { $set: { 'category.name': category.name, 'category.slug': category.slug } });
+  await quizRepository.renameCategory(category);
   res.json(categoryView(category, await usage()));
 }
 
 /** DELETE /api/admin/categories/:id — solo si ningún quiz vivo la usa */
 export async function deleteCategory(req, res) {
   const category = await findCategory(req.params.id);
-  const inUse = await Quiz.countDocuments({ 'category.categoryId': category._id });
+  const inUse = await quizRepository.countByCategory(category._id);
   if (inUse) throw ApiError.conflict('IN_USE', `No se puede borrar: ${inUse} quiz(zes) usan esta categoría`);
   await Category.deleteOne({ _id: category._id });
   res.json({ deleted: true });
@@ -243,12 +229,8 @@ export async function renameTag(req, res) {
   tag.name = req.body.name;
   tag.slug = slugify(req.body.name);
   await category.save();
-  await Quiz.updateMany(
-    { 'tags.tagId': tag._id },
-    { $set: { 'tags.$[t].name': tag.name, 'tags.$[t].slug': tag.slug } },
-    { arrayFilters: [{ 't.tagId': tag._id }] },
-  );
-  await refreshSearchText({ 'tags.tagId': tag._id });
+  await quizRepository.renameTag(tag);
+  await quizRepository.refreshSearchText({ 'tags.tagId': tag._id });
   res.json(categoryView(category, await usage()));
 }
 
@@ -256,7 +238,7 @@ export async function renameTag(req, res) {
 export async function deleteTag(req, res) {
   const category = await findCategory(req.params.id);
   const tag = findTag(category, req.params.tagId);
-  const inUse = await Quiz.countDocuments({ 'tags.tagId': tag._id });
+  const inUse = await quizRepository.countByTag(tag._id);
   if (inUse) throw ApiError.conflict('IN_USE', `No se puede borrar: ${inUse} quiz(zes) usan esta etiqueta`);
   await Category.updateOne({ _id: category._id }, { $pull: { tags: { _id: tag._id } } });
   res.json(categoryView(await findCategory(category._id), await usage()));

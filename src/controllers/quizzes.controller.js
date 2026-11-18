@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { Quiz, QuizVersion, Category, Attempt, Like, Comment } from '../models/index.js';
+import { QuizVersion, Category, Attempt, Like, Comment } from '../models/index.js';
+import * as quizRepository from '../repositories/quiz.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { SearchQuery } from '../utils/searchQuery.js';
 import { parseId, pagination, validateAll } from '../utils/http.js';
@@ -11,7 +12,7 @@ const versionLabel = (t) => (t ? `${t} min` : 'Sin límite');
 // ------------------------------------------------------------ ayudantes
 /** Quiz existente o 404. */
 export async function liveQuiz(id) {
-  const quiz = await Quiz.findById(parseId(id, 'Este quiz no existe o fue eliminado'));
+  const quiz = await quizRepository.findById(parseId(id, 'Este quiz no existe o fue eliminado'));
   if (!quiz) throw ApiError.notFound('Este quiz no existe o fue eliminado');
   return quiz;
 }
@@ -67,10 +68,7 @@ export async function search(req, res) {
   const query = new SearchQuery(req.query.q);
   const { page, limit, skip } = pagination(req.query, { limit: 12 });
   const filter = query.toFilter();
-  const [items, total] = await Promise.all([
-    Quiz.find(filter).sort(query.toSort()).skip(skip).limit(limit),
-    Quiz.countDocuments(filter),
-  ]);
+  const [items, total] = await quizRepository.search(filter, query.toSort(), skip, limit);
   res.json({
     items: items.map((q) => q.toCard()), page, totalPages: Math.max(1, Math.ceil(total / limit)), total, ignored: query.ignored,
   });
@@ -129,14 +127,14 @@ export async function create(req, res) {
   const now = new Date();
   const quizId = new mongoose.Types.ObjectId();
   const version = QuizVersion.build({ quizId, questions: data.questions, timeLimit: data.timeLimit, now });
-  const quiz = new Quiz({ _id: quizId, owner: req.user.toRef(), title: data.title, description: data.description, category, tags, createdAt: now, updatedAt: now });
+  const quiz = quizRepository.build({ _id: quizId, owner: req.user.toRef(), title: data.title, description: data.description, category, tags, createdAt: now, updatedAt: now });
   await validateAll('Revisa los datos del quiz', version); // calcula questionCount, multiple…
   quiz.applyVersion(version);
   await validateAll('Revisa los datos del quiz', quiz);
 
   await version.save();
   try {
-    await quiz.save();
+    await quizRepository.save(quiz);
   } catch (err) {
     await QuizVersion.deleteOne({ _id: version._id }); // sin transacciones: deshacemos a mano
     throw err;
@@ -173,7 +171,7 @@ export async function update(req, res) {
 
   const set = {
     title: data.title, description: data.description, category, tags, updatedAt: now,
-    searchText: Quiz.searchTextFor({ title: data.title, description: data.description, tags }),
+    searchText: quizRepository.searchTextFor({ title: data.title, description: data.description, tags }),
   };
   let next = null;
   if (contentChanged) {
@@ -193,7 +191,7 @@ export async function update(req, res) {
 
   // Si se publicó versión, la condición version: current.version evita pisar otra edición
   const filter = { _id: quiz._id, ...(contentChanged ? { version: current.version } : {}) };
-  const updated = await Quiz.findOneAndUpdate(filter, { $set: set }, { new: true, runValidators: true });
+  const updated = await quizRepository.updateEditable(filter, set);
   if (!updated) {
     if (next) await QuizVersion.deleteOne({ _id: next._id });
     throw ApiError.conflict('VERSION_CONFLICT', 'El quiz cambió mientras lo editabas. Recarga e inténtalo de nuevo.');
@@ -209,7 +207,7 @@ export async function update(req, res) {
 export async function remove(req, res) {
   const quiz = await liveQuiz(req.params.id);
   ownedQuiz(quiz, req.user, 'borrar');
-  const r = await Quiz.deleteOne({ _id: quiz._id });
+  const r = await quizRepository.deleteById(quiz._id);
   if (!r.deletedCount) throw ApiError.notFound('Este quiz no existe o fue eliminado');
 
   const byQuiz = { quizId: quiz._id };
@@ -228,7 +226,7 @@ export async function remove(req, res) {
 
 /** GET /api/users/me/quizzes */
 export async function mine(req, res) {
-  const list = await Quiz.find({ 'owner.userId': req.user._id }).sort({ updatedAt: -1 });
+  const list = await quizRepository.findByOwner(req.user._id);
   res.json(list.map((q) => ({ ...q.toCard(), version: q.version, updatedAt: iso(q.updatedAt) })));
 }
 
@@ -245,11 +243,11 @@ export async function like(req, res) {
   if (!(await hasCompleted(me._id, quiz._id))) throw ApiError.forbidden('Completa el quiz para poder darle like');
   try {
     const r = await Like.updateOne({ userId: me._id, quizId: quiz._id }, { $setOnInsert: { createdAt: new Date() } }, { upsert: true });
-    if (r.upsertedCount === 1) await Quiz.updateOne({ _id: quiz._id }, { $inc: { likesCount: 1 } });
+    if (r.upsertedCount === 1) await quizRepository.incrementLikes(quiz._id);
   } catch (err) {
     if (err.code !== 11000) throw err; // otra petición lo creó primero: ya cuenta
   }
-  const fresh = await Quiz.findById(quiz._id, 'likesCount');
+  const fresh = await quizRepository.findById(quiz._id, 'likesCount');
   res.json({ likesCount: fresh.likesCount, likedByMe: true });
 }
 
@@ -257,7 +255,7 @@ export async function like(req, res) {
 export async function unlike(req, res) {
   const quiz = await liveQuiz(req.params.id);
   const r = await Like.deleteOne({ userId: req.user._id, quizId: quiz._id });
-  if (r.deletedCount === 1) await Quiz.updateOne({ _id: quiz._id, likesCount: { $gt: 0 } }, { $inc: { likesCount: -1 } });
-  const fresh = await Quiz.findById(quiz._id, 'likesCount');
+  if (r.deletedCount === 1) await quizRepository.decrementLikes(quiz._id);
+  const fresh = await quizRepository.findById(quiz._id, 'likesCount');
   res.json({ likesCount: fresh.likesCount, likedByMe: false });
 }
