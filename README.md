@@ -4,7 +4,7 @@ Plataforma de quizzes con versiones, intentos cronometrados, likes y foro.
 
 - **Backend:** Node.js + Express 5 + MongoDB (Mongoose) + express-validator.
 - **Frontend:** una sola página (SPA) en JavaScript puro. Cada vista es una función que genera su HTML.
-- **Arquitectura:** Modelo-Vista-Controlador dentro de `src/`.
+- **Arquitectura:** Modelo-Vista-Controlador dentro de `src/`, con un repository para el recurso principal (Route → Controller → Repository → Model `Quiz` → MongoDB).
 
 ---
 
@@ -67,6 +67,8 @@ src/
 ├── models/            M · Esquemas de Mongoose y reglas de negocio de cada colección
 │   ├── User.js  Category.js  Quiz.js  QuizVersion.js  Attempt.js  Like.js  Comment.js
 │   └── index.js
+├── repositories/      Acceso a datos del recurso principal: única capa que usa el modelo Quiz
+│   └── quiz.repository.js        findById, search, build/save, updateEditable, deleteById, contadores…
 ├── controllers/       C · Un archivo por recurso; cada función es un endpoint
 │   ├── auth.controller.js        registro, login, logout, sesión
 │   ├── categories.controller.js
